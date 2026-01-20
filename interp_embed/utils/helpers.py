@@ -65,7 +65,7 @@ def log_tqdm_message(message, level="INFO"):
     formatted_msg = f"[{timestamp}] {level}: {message}"
     tqdm.write(formatted_msg)
 
-def highlight_activations_as_string(tokens, activations, left_marker, right_marker):
+def highlight_activations_as_string(tokens, activations, left_marker = "<<", right_marker = ">>"):
   result = []
   in_highlight = False
   for token, activation in zip(tokens, activations):
@@ -77,7 +77,7 @@ def highlight_activations_as_string(tokens, activations, left_marker, right_mark
           in_highlight = False
       result.append(token)
   if in_highlight:
-      result.append(">>")
+      result.append(right_marker)
   return "".join(result)
 
 def token_count_as_string(tokens):
