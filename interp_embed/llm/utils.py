@@ -44,7 +44,6 @@ async def call_async_llm(
     client: AsyncOpenAI,
     model: str,
     messages: List[Dict[str, str]],
-    max_tokens: Optional[int] = None,
     **kwargs
 ):
     is_openai_model = model.startswith("openai/")
@@ -62,7 +61,6 @@ async def call_async_llm(
         response = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=max_tokens,
             **kwargs
         )
     else:
@@ -71,7 +69,6 @@ async def call_async_llm(
         response = await client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=max_tokens,
             temperature=temperature,
             **{k: v for k, v in kwargs.items() if k != "temperature"}
         )
