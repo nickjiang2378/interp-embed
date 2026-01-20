@@ -79,6 +79,8 @@ class Dataset():
         if compute_activations:
             self._compute_latents(save_path, save_every_batch, batch_size=batch_size)
 
+        self._latents_cache = {}  # Cache for latents() results, reset whenever the dataset is reloaded
+
     def _compute_latents(self, save_path = None, save_every_batch = 5, batch_size = 8):
 
         data_as_dict = self.dataset.to_dict(orient = "records")
@@ -198,6 +200,10 @@ class Dataset():
     def feature_labels(self):
         return {int(key): value for key, value in self._feature_labels.items()}
 
+    def set_feature_label(self, feature, label):
+        assert isinstance(label, str), f"Label must be a string. Found type {type(label)}"
+        self._feature_labels[feature] = label
+
     def latents(self, aggregation_method = "max", compress = False, activated_threshold = 0):
         """
         Get the feature activations for all samples.
@@ -207,6 +213,10 @@ class Dataset():
         """
         if self.num_documents == 0:
             return None
+
+        cache_key = (aggregation_method, activated_threshold)
+        if not compress and cache_key in self._latents_cache:
+            return self._latents_cache[(aggregation_method, activated_threshold)]
 
         d_sae = 4096 # default SAE dimension if no latents have been computed
         for row in self.rows:
@@ -221,7 +231,10 @@ class Dataset():
                     all_activations.append(row.latents("all", compress = compress))
                 else:
                     all_activations.append(np.full(d_sae, np.nan) if not compress else csr_matrix(np.full(d_sae, np.nan)))
-            return np.array(all_activations, dtype=np.object_) if not compress else all_activations
+            if not compress:
+                self._latents_cache[cache_key] = np.array(all_activations, dtype=np.object_)
+                return self._latents_cache[cache_key]
+            return all_activations
 
         all_feature_activations = []
         if aggregation_method in ["max", "mean", "sum", "binarize", "count"]:
@@ -234,7 +247,11 @@ class Dataset():
             raise ValueError(f"Unsupported aggregation method for feature activations: {aggregation_method}")
 
         all_feature_activations_NF = vstack(all_feature_activations)
-        return all_feature_activations_NF if compress else all_feature_activations_NF.toarray()
+        if not compress:
+            self._latents_cache[cache_key] = all_feature_activations_NF.toarray()
+            return self._latents_cache[cache_key]
+        else:
+            return all_feature_activations_NF
 
     def top_documents_for_feature(self, feature, aggregation_type = "max", k = 10, select_top = True, include_nonactive_samples = False, include_active_samples = True):
         latents = self.latents(aggregation_method = aggregation_type)[:, feature]
@@ -246,9 +263,9 @@ class Dataset():
             valid_mask[latents == 0] = False
         valid_indices = np.where(valid_mask)[0]
         if select_top:
-            selected_indices = np.argpartition(latents[valid_indices], -k)[-k:] if len(valid_indices) > k else valid_indices
+            selected_indices = np.argpartition(latents[valid_indices], -k)[-k:] if len(valid_indices) > k else np.arange(len(valid_indices))
         else:
-            selected_indices = np.argpartition(latents[valid_indices], k)[:k] if len(valid_indices) > k else valid_indices
+            selected_indices = np.argpartition(latents[valid_indices], k)[:k] if len(valid_indices) > k else np.arange(len(valid_indices))
 
         return [self.rows[ind].token_activations(feature) for ind in valid_indices[selected_indices]]
 
@@ -277,6 +294,8 @@ class Dataset():
             call_async_llm(client=llm_client, model=model, messages=[{"role": "user", "content": prompt}])
             for prompt in negative_prompts
         ]
+
+        await asyncio.sleep(0)
 
         positive_responses = await asyncio.gather(*positive_tasks)
         negative_responses = await asyncio.gather(*negative_tasks)
@@ -319,6 +338,9 @@ class Dataset():
 
         labeling_prompt = build_labeling_prompt(positive_samples, negative_samples, label_and_score = label_and_score)
         llm_client = get_llm_client(is_openai_model=model.startswith("openai/"), is_async=True)
+        
+        await asyncio.sleep(0)
+
         response = await call_async_llm(client=llm_client, model=model, messages=[{"role": "user", "content": labeling_prompt}])
 
         # Process LLM response
@@ -420,7 +442,7 @@ class Dataset():
         columns = self.dataset.columns.tolist()
         columns_with_quotes = [f"'{column}'" for column in columns]
 
-        return f"Dataset {self.id}(\n" + f"{' ' * 2}columns=[{', '.join(columns_with_quotes)}]\n" + f"{' ' * 2}rows=[\n" + "\n".join(rows) + "\n  ]" + f"{' ' * 2}na_rows={len([row for row in self.rows if row is None])}" + "\n)"
+        return f"Dataset {self.id}(\n" + f"{' ' * 2}columns=[{', '.join(columns_with_quotes)}]\n" + f"{' ' * 2}rows=[\n" + "\n".join(rows) + "\n  ]\n" + f"{' ' * 2}na_rows={len([row for row in self.rows if row is None])}" + "\n)"
 
     def __len__(self):
         return len(self.rows)
@@ -510,13 +532,14 @@ class DatasetRow():
 
     def token_activations(self, feature, as_string = True, left_marker = "<<", right_marker = ">>"):
         tokens = truncate_chat_template_tokens(self.tokenized_document) if self.truncate_chat_template else self.tokenized_document
-        feature_activations = truncate_chat_template_activations(self.latents("all")) if self.truncate_chat_template else self.latents("all")
+        latents_for_feature = self.activations[:, feature].toarray().flatten()
+        if self.truncate_chat_template:
+            latents_for_feature = truncate_chat_template_activations(latents_for_feature)
 
-        activations = feature_activations[:, feature]
         if as_string:
-            return highlight_activations_as_string(tokens, activations, left_marker, right_marker)
+            return highlight_activations_as_string(tokens, latents_for_feature, left_marker, right_marker)
         else:
-            return [{"token": token, "activation": activation.item()} for token, activation in zip(tokens, activations)]
+            return [{"token": token, "activation": activation.item()} for token, activation in zip(tokens, latents_for_feature)]
 
     def document(self):
         return self.data
