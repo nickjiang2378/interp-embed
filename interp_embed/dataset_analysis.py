@@ -204,19 +204,36 @@ class Dataset():
         assert isinstance(label, str), f"Label must be a string. Found type {type(label)}"
         self._feature_labels[feature] = label
 
-    def latents(self, aggregation_method = "max", compress = False, activated_threshold = 0):
+    def latents(self, aggregation_method = "max", compress = False, activated_threshold = 0, return_copy = True):
         """
-        Get the feature activations for all samples.
+        Returns the latent (feature activation) matrix for all documents in the dataset.
 
-        :param feature_activation_type: Method of aggregating activations across tokens per sample ('max', 'mean', or 'sum')
-        :return: Numpy array of feature activations
+        Each row in the output corresponds to a particular document, and each column corresponds to a feature.
+        Aggregation is performed across tokens in each document according to the specified method.
+
+        Args:
+            aggregation_method (str): Method of aggregating activations across tokens per document.
+                Supported: "max", "mean", "sum", "binarize", "count", or "all" (no aggregation).
+            compress (bool): If True, returns a compressed (sparse) matrix; otherwise, returns a dense (numpy) array.
+            activated_threshold (float): Minimum value required to mark a feature as active. Only used by some aggregation methods.
+            return_copy (bool): If True, returns a copy of the cached result, if available.
+
+        Returns:
+            np.ndarray or scipy.sparse.csr_matrix or list:
+                - Numpy array (dense, shape: [num_documents, num_features]) when compress=False and aggregation_method != 'all'
+                - scipy.sparse.csr_matrix when compress=True and aggregation_method != 'all'
+                - If aggregation_method == 'all', returns a list of arrays or sparse arrays, one per row.
+                - If dataset is empty, returns None.
+
+        Raises:
+            ValueError: If an unsupported aggregation_method is provided.
         """
         if self.num_documents == 0:
             return None
 
         cache_key = (aggregation_method, activated_threshold)
         if not compress and cache_key in self._latents_cache:
-            return self._latents_cache[(aggregation_method, activated_threshold)]
+            return self._latents_cache[cache_key].copy() if return_copy else self._latents_cache[cache_key]
 
         d_sae = 4096 # default SAE dimension if no latents have been computed
         for row in self.rows:
@@ -233,7 +250,7 @@ class Dataset():
                     all_activations.append(np.full(d_sae, np.nan) if not compress else csr_matrix(np.full(d_sae, np.nan)))
             if not compress:
                 self._latents_cache[cache_key] = np.array(all_activations, dtype=np.object_)
-                return self._latents_cache[cache_key]
+                return self._latents_cache[cache_key].copy() if return_copy else self._latents_cache[cache_key]
             return all_activations
 
         all_feature_activations = []
@@ -249,12 +266,12 @@ class Dataset():
         all_feature_activations_NF = vstack(all_feature_activations)
         if not compress:
             self._latents_cache[cache_key] = all_feature_activations_NF.toarray()
-            return self._latents_cache[cache_key]
+            return self._latents_cache[cache_key].copy() if return_copy else self._latents_cache[cache_key]
         else:
             return all_feature_activations_NF
 
     def top_documents_for_feature(self, feature, aggregation_type = "max", k = 10, select_top = True, include_nonactive_samples = False, include_active_samples = True):
-        latents = self.latents(aggregation_method = aggregation_type)[:, feature]
+        latents = self.latents(aggregation_method = aggregation_type, return_copy = False)[:, feature]
         valid_mask = np.ones(latents.shape[0], dtype=bool)
         valid_mask[np.isnan(latents)] = False
         if not include_active_samples:
@@ -338,7 +355,7 @@ class Dataset():
 
         labeling_prompt = build_labeling_prompt(positive_samples, negative_samples, label_and_score = label_and_score)
         llm_client = get_llm_client(is_openai_model=model.startswith("openai/"), is_async=True)
-        
+
         await asyncio.sleep(0)
 
         response = await call_async_llm(client=llm_client, model=model, messages=[{"role": "user", "content": labeling_prompt}])
@@ -370,7 +387,7 @@ class Dataset():
         Sort data samples by specified features and activation type.
 
         """
-        feature_activations_DF = self.latents(aggregation_type)
+        feature_activations_DF = self.latents(aggregation_type, return_copy = False)
 
         selected_feature_activations = feature_activations_DF[:, features]
         feature_labels = self.feature_labels()
