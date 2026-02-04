@@ -82,11 +82,13 @@ top_documents = dataset.top_documents_for_feature(feature = 65478)
 
 For analyses (e.g. dataset diffing, correlations) done on example datasets, see the `examples/` folder.
 
+For an API reference, see our `docs` folder.
+
 ## How does this work?
 ![InterpEmbed Method Overview](assets/method.png)
 
-Given a dataset of text documents, we pass each document into a "reader" LLM and compute the SAE latents with a pretrained SAE (i.e. at a specific layer). For each document, we max-pool the latents across tokens to produce a single, high-dimensional, interpretable embedding whose dimensions map to granular concepts like tone, reasoning style, etc.
+To embed a document with a sparse autoencoder, we pass the text into a "reader" LLM and compute the latents of a pretrained SAE (i.e. at a specific layer). For each document, we max-pool the latents across tokens to produce a single, high-dimensional, interpretable embedding whose dimensions map to granular concepts like tone, reasoning style, etc.
 
-InterpEmbed efficiently computes and stores these embeddings for use in downstream analysis tasks (e.g. dataset comparisons). It is well-suited for detecting unknown unknowns in datasets given the large hypothesis space of SAEs.
+InterpEmbed efficiently computes and stores these embeddings for use in downstream analysis tasks (e.g. dataset comparisons). Given the large hypothesis space of SAEs, it is particularly well-suited for discovering unknown unknowns about datasets.
 
 For a brief introduction to sparse autoencoders, see [here](https://www.lesswrong.com/posts/8YnHuN55XJTDwGPMr/a-gentle-introduction-to-sparse-autoencoders) and [here](https://adamkarvonen.github.io/machine_learning/2024/06/11/sae-intuitions.html).
