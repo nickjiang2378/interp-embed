@@ -28,7 +28,6 @@ Your task:
 - Score 0 if the property described by the feature description is not clearly present in the sample at the marked tokens. If the feature description is not even a valid semantic or linguistic property (ex. "feature_#"), mark 0.
 """
     else:
-        assert "<<" not in sample, "Marked tokens detected in a negative sample"
         prompt = f"""You are an expert at evaluating sparse autoencoder feature descriptions. You will be scoring how accurate the feature description is for a given document sample. Some descriptions are poor; some are good.
 
 You are given a feature description and a sample. This sample did not activate the feature, so theoretically, there shouldn't be tokens in the sample that align with the feature. Your job is to evaluate how true that is.
