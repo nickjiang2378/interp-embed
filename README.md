@@ -3,7 +3,7 @@
 </p>
 
 `interp-embed` is a toolkit for embedding text corpora with sparse autoencoders (SAE) for qualitative analysis. In contrast with dense embeddings (e.g. BERT), each dimension of these embeddings corresponds with interpretable concepts like "hedging language".
-- Example use cases: find differences in content and style between datasets, detect bias and distribution shifts, and cluster documents along meaningful axes like reasoning style (see `examples`)
+- Example use cases: find differences in content and style between datasets, detect bias and distribution shifts, and cluster documents along meaningful axes like reasoning style (see `examples/`)
 - See our [case studies](https://interp-embed.com) on qualitatively comparing frontier models and debugging post-training datasets.
 - [Read our paper](https://arxiv.org/abs/2512.10092) or the [project page](https://interp-embed.com)
 
