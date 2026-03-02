@@ -2,11 +2,10 @@
   <h1 align="center">Interpretable Embeddings with Sparse Autoencoders: A Data Analysis Toolkit</h1>
 </p>
 
-InterpEmbed is an exploratory toolkit for analyzing unstructured text datasets with sparse autoencoders (SAEs).
-- [Read our paper](https://arxiv.org/abs/2512.10092) or the [project page](https://interp-embed.com)
-- Example uses: dataset comparisons, bias detection, controllable clustering (see `examples/`)
+`interp-embed` is a toolkit for embedding text corpora with sparse autoencoders (SAE) for qualitative analysis. In contrast with dense embeddings (e.g. BERT), each dimension of these embeddings corresponds with interpretable concepts like "hedging language".
+- Example use cases: find differences in content and style between datasets, detect bias and distribution shifts, and cluster documents along meaningful axes like reasoning style (see `examples`)
 - See our [case studies](https://interp-embed.com) on qualitatively comparing frontier models and debugging post-training datasets.
-
+- [Read our paper](https://arxiv.org/abs/2512.10092) or the [project page](https://interp-embed.com)
 
 
 For code to reproduce our paper, see the `paper/` directory.
@@ -28,7 +27,7 @@ uv sync # To install uv, see https://docs.astral.sh/uv/getting-started/installat
 pip install -e .
 ```
 
-Create a `.env` file that has `OPENROUTER_API_KEY` and `OPENAI_KEY`. We use these models for creating feature labels if they don't exist. Please also sign into the hugging face cli when accessing models from gated repos (e.g. if you use GoodfireSAE, make sure to have access to Llama-3.1-8B-Instruct).
+Please also sign into the hugging face cli when accessing models from gated repos (e.g. if you use GoodfireSAE, make sure to have access to Llama-3.1-8B-Instruct). Optionally, create a `.env` file that has `OPENROUTER_API_KEY` and `OPENAI_KEY`. We use these models for creating feature labels if they don't exist on Neuronpedia.
 
 ## Quickstart
 First, create a dataset object. We currently support SAEs from SAELens (`LocalSAE`) and Goodfire (`GoodfireSAE`).
@@ -85,10 +84,10 @@ For analyses (e.g. dataset diffing, correlations) done on example datasets, see 
 For an API reference, see our `docs` folder.
 
 ## How does this work?
-![InterpEmbed Method Overview](assets/method.png)
+![Method Overview](assets/method.png)
 
 To embed a document with a sparse autoencoder, we pass the text into a "reader" LLM and compute the latents of a pretrained SAE (i.e. at a specific layer). For each document, we max-pool the latents across tokens to produce a single, high-dimensional, interpretable embedding whose dimensions map to granular concepts like tone, reasoning style, etc.
 
-InterpEmbed efficiently computes and stores these embeddings for use in downstream analysis tasks (e.g. dataset comparisons). Given the large hypothesis space of SAEs, it is particularly well-suited for discovering unknown unknowns about datasets.
+`interp-embed` efficiently computes and stores these embeddings for use in downstream analysis tasks (e.g. dataset comparisons). Given the large hypothesis space of SAEs, it is particularly well-suited for discovering unknown unknowns about datasets.
 
 For a brief introduction to sparse autoencoders, see [here](https://www.lesswrong.com/posts/8YnHuN55XJTDwGPMr/a-gentle-introduction-to-sparse-autoencoders) and [here](https://adamkarvonen.github.io/machine_learning/2024/06/11/sae-intuitions.html).
