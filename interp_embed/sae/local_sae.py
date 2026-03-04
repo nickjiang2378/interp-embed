@@ -8,7 +8,15 @@ from functools import partial
 import warnings
 
 from .base_sae import BaseSAE, SAEType
-from .utils import process_device_config, ensure_loaded, try_to_load_feature_labels, goodfire_sae_loader, store_activations_hook, get_goodfire_config
+from .utils import (
+    process_device_config,
+    ensure_loaded,
+    try_to_load_feature_labels,
+    goodfire_sae_loader,
+    store_activations_hook,
+    get_goodfire_config,
+    get_hookpoint,
+)
 
 class LocalSAE(BaseSAE):
   def __init__(self, sae_id = "blocks.8.hook_resid_pre", release = "gpt2-small-res-jb", **kwargs):
@@ -67,6 +75,8 @@ class LocalSAE(BaseSAE):
 
     feature_acts_np = feature_acts.detach().cpu().numpy()
     attn_mask = tokens["attention_mask"].numpy().astype(bool)
+    torch.cuda.empty_cache()
+    
     return [csr_matrix(feature_acts_np[i][attn_mask[i]]) for i in range(feature_acts_np.shape[0])]
 
   @ensure_loaded
@@ -168,6 +178,97 @@ class GoodfireSAE(BaseSAE):
 
     return [csr_matrix(feature_acts_np[i][attn_mask[i]]) for i in range(feature_acts_np.shape[0])]
 
+  def destroy_models(self):
+    self.activations = dict()
+    self.activation_hook_handle.remove()
+    self.model = None
+    self.sae = None
+
+class LocalHfSAE(BaseSAE):
+  def __init__(self, hf_repo, hookpoint, layer, sae_id = "blocks.8.hook_resid_pre", release = "gpt2-small-res-jb", quantize = False, **kwargs):
+
+    super().__init__(**kwargs)
+    self.sae_id = sae_id
+    self.release = release
+    self.model = None
+    self.sae = None
+    self.tokenizer = None
+    self.hf_repo = hf_repo
+    self.hookpoint = hookpoint
+    self.layer = layer
+    self.quantize = quantize
+
+  def metadata(self):
+    parent_metadata = super().metadata()
+    parent_metadata.update({
+      "sae_id": self.sae_id,
+      "release": self.release,
+      "device": {
+        "model": self.model_device,
+        "sae": self.sae_device
+      },
+      "quantize": self.quantize,
+      "hf_repo": self.hf_repo,
+      "hookpoint": self.hookpoint,
+      "layer": self.layer,
+      "sae_type": SAEType.LOCAL_HF
+    })
+    return parent_metadata
+
+  def load_models(self):
+    # Load the model, sae, and tokenizer
+    bnb_config = BitsAndBytesConfig(
+        load_in_8bit = True,
+        bnb_8bit_compute_dtype=torch.float32
+    )
+
+    if self.quantize:
+      warnings.warn("Quantizing the language model may cause feature activations to be less accurate.")
+
+    self.model = AutoModelForCausalLM.from_pretrained(
+        self.hf_repo,
+        quantization_config=bnb_config if self.quantize else None,
+        device_map=self.model_device
+    )
+
+    # Add hooks to the model
+    self.activations = {}
+
+    activation_hook = partial(store_activations_hook, activations=self.activations, name=f"internal")
+    self.activation_hook_handle = get_hookpoint(self.model, self.hookpoint, self.layer).register_forward_hook(activation_hook)
+    torch.cuda.empty_cache()
+
+    self.tokenizer = AutoTokenizer.from_pretrained(self.hf_repo)
+    self.sae = SAEModel.from_pretrained(
+        release=self.release,
+        sae_id=self.sae_id,
+        device=self.sae_device,
+    )
+
+    self.tokenizer.pad_token = self.tokenizer.eos_token
+
+  @ensure_loaded
+  def encode(self, texts):
+    inputs = self.tokenize(texts, padding=True, as_tokens=False)
+
+    with torch.no_grad():
+      outputs = self.model(
+        input_ids = torch.tensor(inputs["input_ids"]).to(self.model.device),
+        attention_mask = torch.tensor(inputs["attention_mask"]).to(self.model.device)
+      )
+
+      feature_acts = self.sae.encode(self.activations["internal"].to(self.sae.device))
+
+    feature_acts_np = feature_acts.float().detach().cpu().numpy()
+    attn_mask = np.array(inputs["attention_mask"]).astype(bool)
+
+    # Clean up memory
+    del outputs, inputs
+    torch.cuda.empty_cache()
+
+    return [csr_matrix(feature_acts_np[i][attn_mask[i]]) for i in range(feature_acts_np.shape[0])]
+
+  @ensure_loaded
   def destroy_models(self):
     self.activations = dict()
     self.activation_hook_handle.remove()

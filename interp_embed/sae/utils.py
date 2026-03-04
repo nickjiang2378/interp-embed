@@ -166,3 +166,9 @@ def store_activations_hook(model, input, output, activations, name):
     activations[name] = (
         output[0].detach().cpu() if isinstance(output, tuple) else output.detach().cpu()
     )
+
+def get_hookpoint(model, hookpoint, layer):
+    obj = model
+    for attr in hookpoint.split("."):
+        obj = getattr(obj, attr)
+    return obj[layer]

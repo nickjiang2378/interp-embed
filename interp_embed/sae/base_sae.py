@@ -108,5 +108,6 @@ class BaseSAE(ABC):
 
 class SAEType(Enum):
     LOCAL = "local"
+    LOCAL_HF = "local_hf"
     GOODFIRE = "goodfire"
     GOODFIRE_API = "goodfire_api"
