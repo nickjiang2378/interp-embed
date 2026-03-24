@@ -27,19 +27,20 @@ uv sync # To install uv, see https://docs.astral.sh/uv/getting-started/installat
 pip install -e .
 ```
 
-Please also sign into the hugging face cli when accessing models from gated repos (e.g. if you use GoodfireSAE, make sure to have access to Llama-3.1-8B-Instruct). Optionally, create a `.env` file that has `OPENROUTER_API_KEY` and `OPENAI_KEY`. We use these models for creating feature labels if they don't exist on Neuronpedia.
+Please also sign into the hugging face cli when accessing models from gated repos (e.g. if you use LocalSAE with Llama, make sure to have access to Llama-3.1-8B-Instruct). Optionally, create a `.env` file that has `OPENROUTER_API_KEY` and `OPENAI_KEY`. We use these APIs for creating feature labels if they don't exist on Neuronpedia for the selected SAE.
 
 ## Quickstart
-First, create a dataset object. We currently support SAEs from SAELens (`LocalSAE`) and Goodfire (`GoodfireSAE`).
+First, create a dataset object. We currently support SAEs from SAELens (`LocalSAE`) and Neuronpedia (`NeuronpediaApiSAE`).
 
 ```python
 from interp_embed import Dataset
-from interp_embed.sae import GoodfireSAE
+from interp_embed.sae import LocalSAE
 import pandas as pd
 
-# 1. Load a Goodfire SAE or SAE supported through the SAELens package
-sae = GoodfireSAE(
-    variant_name="Llama-3.1-8B-Instruct-SAE-l19",
+# 1. Load an SAE supported through the SAELens package
+sae = LocalSAE(
+    release="goodfire-llama-3.1-8b-instruct",
+    sae_id="layer_19",
     device="cuda:0",
 )
 
@@ -83,8 +84,10 @@ For analyses (e.g. dataset diffing, correlations) done on example datasets, see 
 
 For an API reference, see our `docs` folder.
 
-## How does this work?
-![Method Overview](assets/method.png)
+## Methodology
+<p align="center">
+  <img src="assets/method.png" alt="Method Overview" width="70%"/>
+</p>
 
 To embed a document with a sparse autoencoder, we pass the text into a "reader" LLM and compute the latents of a pretrained SAE (i.e. at a specific layer). For each document, we max-pool the latents across tokens to produce a single, high-dimensional, interpretable embedding whose dimensions map to granular concepts like tone, reasoning style, etc.
 
