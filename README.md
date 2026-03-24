@@ -86,7 +86,7 @@ For an API reference, see our `docs` folder.
 
 ## Methodology
 <p align="center">
-  <img src="assets/method.png" alt="Method Overview" width="70%" style="background-color: white; padding: 20px; border-radius: 8px;"/>
+  <img src="assets/method.png" alt="Method Overview" width="70%"/>
 </p>
 
 To embed a document with a sparse autoencoder, we pass the text into a "reader" LLM and compute the latents of a pretrained SAE (i.e. at a specific layer). For each document, we max-pool the latents across tokens to produce a single, high-dimensional, interpretable embedding whose dimensions map to granular concepts like tone, reasoning style, etc.
