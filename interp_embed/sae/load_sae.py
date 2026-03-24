@@ -8,9 +8,9 @@ def load_sae_from_metadata(metadata):
   if metadata["sae_type"] == SAEType.LOCAL:
     from .local_sae import LocalSAE
     return LocalSAE.from_metadata(sae_metadata)
-  elif metadata["sae_type"] == SAEType.GOODFIRE_API:
-    from .api_sae import GoodfireApiSAE
-    return GoodfireApiSAE.from_metadata(sae_metadata)
+  elif metadata["sae_type"] == SAEType.NEURONPEDIA_API:
+    from .neuronpedia_sae import NeuronpediaApiSAE
+    return NeuronpediaApiSAE.from_metadata(sae_metadata)
   elif metadata["sae_type"] == SAEType.GOODFIRE:
     from .local_sae import GoodfireSAE
     return GoodfireSAE.from_metadata(sae_metadata)

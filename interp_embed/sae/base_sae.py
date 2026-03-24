@@ -41,6 +41,8 @@ class BaseSAE(ABC):
 
   @ensure_loaded
   def encode_chat(self, chat_conversations):
+    if self.tokenizer == None:
+      raise ValueError("Tokenizer not defined. Chat template doesn't exist.")
     texts = [self.tokenizer.apply_chat_template(chat_conversation, tokenize=False) for chat_conversation in chat_conversations]
     return self.encode(texts)
 
@@ -52,47 +54,7 @@ class BaseSAE(ABC):
 
   @ensure_loaded
   def chat_template_exists(self):
-    return self.tokenizer.chat_template != None
-
-  @ensure_loaded
-  def tokenize(self, documents, as_tokens = True, padding: bool = False):
-    """
-    Tokenizes a list of documents.
-
-    :param documents: List of documents to tokenize. Must be a list of strings
-    :param as_tokens: If True, return human-readable token strings. If False, return token IDs
-    :param padding: Whether to pad sequences
-    """
-    if self.chat_template_exists():
-      formatted_text = [
-          self.tokenizer.apply_chat_template(
-              [
-                  {
-                      "role": "assistant" if self.use_assistant_role else "user",
-                      "content": document
-                  }
-              ],
-              tokenize=False
-          )
-          for document in documents
-      ]
-    else:
-      formatted_text = documents
-
-    inputs = self.tokenizer(
-      formatted_text,
-      truncation=self.truncate,
-      add_special_tokens=not self.chat_template_exists(),
-      padding=padding
-    )
-
-    input_ids = inputs["input_ids"]
-
-    if not as_tokens:
-      return inputs
-
-    # Return human-readable tokens by decoding each token individually
-    return [[self.tokenizer.decode([token_id]) for token_id in input_sequence] for input_sequence in input_ids]
+    return self.tokenizer is not None and self.tokenizer.chat_template is not None
 
   @abstractmethod
   def load_models(self):
@@ -109,4 +71,4 @@ class BaseSAE(ABC):
 class SAEType(Enum):
     LOCAL = "local"
     GOODFIRE = "goodfire"
-    GOODFIRE_API = "goodfire_api"
+    NEURONPEDIA_API = "neuronpedia_api"

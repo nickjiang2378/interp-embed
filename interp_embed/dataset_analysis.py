@@ -108,10 +108,10 @@ class Dataset():
             selected_documents = [document_list[ind] for ind in selected_document_indices[batch_size*i: batch_size*(i + 1)]]
             try:
                 # Compute latents for the batch of documents
-                batch_activations = self.sae.encode(selected_documents)
+                tokenized_documents, batch_activations = self.sae.encode(selected_documents)
 
                 # Tokenize the documents
-                tokenized_documents = self.sae.tokenize(selected_documents)
+                # tokenized_documents = self.sae.tokenize(selected_documents)
 
                 # Update the successful token count
                 self.token_count += sum([activations.shape[0] for activations in batch_activations if activations is not None])
@@ -281,7 +281,12 @@ class Dataset():
             return all_feature_activations_NF
 
     def top_documents_for_feature(self, feature, aggregation_type = "max", k = 10, select_top = True, include_nonactive_samples = False, include_active_samples = True):
-        latents = self._get_cached_latents(aggregation_method = aggregation_type)[:, feature]
+        cached_latents = self._get_cached_latents(aggregation_method = aggregation_type)
+        if cached_latents is None:
+            latents = self.latents(aggregation_method = aggregation_type)
+        else:
+            latents = cached_latents
+        latents = latents[:, feature]
         valid_mask = np.ones(latents.shape[0], dtype=bool)
         valid_mask[np.isnan(latents)] = False
         if not include_active_samples:

@@ -1,17 +1,8 @@
 import asyncio
-import os
-from dotenv import load_dotenv
-from goodfire.api.features.client import AsyncFeaturesAPI
-from goodfire import Variant
-from scipy.sparse import csr_matrix
-from transformers import AutoTokenizer
-from typing import List, Dict, Callable
+from typing import List, Callable
 
 from .base_sae import BaseSAE
-from .utils import ensure_loaded, try_to_load_feature_labels
-from ..utils.helpers import run_async_in_any_context, log_tqdm_message
-
-load_dotenv()
+from ..utils.helpers import log_tqdm_message
 
 class ApiSAE(BaseSAE):
   def __init__(self, max_concurrency: int = 8, max_retries: int = 3, base_delay: int = 2.0, **kwargs):
@@ -63,62 +54,3 @@ class ApiSAE(BaseSAE):
         log_tqdm_message("Testing 123", level="INFO")
     return await asyncio.gather(*[worker(coroutine_func) for coroutine_func in coroutine_funcs])
 
-class GoodfireApiSAE(ApiSAE):
-  def __init__(self, variant_name: str, **kwargs):
-    super().__init__(**kwargs)
-
-    GOODFIRE_API_KEY = os.getenv("GOODFIRE_API_KEY")
-    assert GOODFIRE_API_KEY is not None, "GOODFIRE_API_KEY is not set"
-
-    self.client = AsyncFeaturesAPI(GOODFIRE_API_KEY)
-    self.variant = Variant(variant_name)
-
-  def metadata(self):
-    parent_metadata = super().metadata()
-    parent_metadata["variant"] = self.variant.base_model
-    parent_metadata["use_assistant_role"] = self.use_assistant_role
-    return parent_metadata
-
-  def load_feature_labels(self):
-    self._feature_labels = try_to_load_feature_labels(f"goodfire/{self.variant.base_model}.json")
-    if self._feature_labels:
-      self._feature_labels = {int(key): value for key, value in self._feature_labels.items()} # Convert keys to ints
-
-  def load_models(self):
-    # Load the tokenizer
-    try:
-      self.tokenizer = AutoTokenizer.from_pretrained(self.variant.base_model)
-
-    except Exception as e:
-      raise Exception(f"Failed to load tokenizer for variant {self.variant.base_model}: {e}")
-
-  @ensure_loaded
-  def encode(self, texts):
-    chat_conversations = [
-        [
-            {
-                "role": "assistant" if self.use_assistant_role else "user",
-                "content": text
-            }
-        ]
-        for text in texts
-    ]
-    return run_async_in_any_context(self.async_encode_chat(chat_conversations))
-
-  @ensure_loaded
-  def encode_chat(self, chat_conversations):
-    return run_async_in_any_context(self.async_encode_chat(chat_conversations))
-
-  async def async_encode_chat(self, chat_conversations: List[List[Dict[str, str]]]):
-    async def get_activations(chat_conversation):
-      activations = await self.client.activations(chat_conversation, self.variant)
-      return csr_matrix(activations)
-
-    coroutine_funcs = [
-        lambda i=i: get_activations(chat_conversations[i])
-        for i in range(len(chat_conversations))
-    ]
-    return await self.retry_api_with_backoff(coroutine_funcs)
-
-  def destroy_models(self):
-    pass

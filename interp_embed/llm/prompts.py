@@ -83,7 +83,9 @@ NEGATIVE SAMPLES(given as a list of strings):
 Your task:
 - Carefully compare the POSITIVE and NEGATIVE samples
 - Look at BOTH the tokens before the << >> markers AND the marked tokens themselves to understand what the feature is detecting.
-- Identify the most specific and concise property that is present in the POSITIVE samples (considering both context and marked tokens), but absent in the NEGATIVE samples.
+- Identify a clear, easily-understandable property that is present in the POSITIVE samples (considering both context and marked tokens), but absent in the NEGATIVE samples.
+- If there is not clear distinguishable concept, then state that.
+- Do not list out more than two examples of the property (e.g. phrasings or specific tokens).
 - Try to give a unified property that isn't just a list of properties, if possible.
 - Summarize the common attribute or property that causes the feature to activate. Be as specific as possible, but keep your description concise and clear.
 - Do not reference specific sample numbers; however, you can reference the content in the positive and negative samples

@@ -67,7 +67,7 @@ class LocalSAE(BaseSAE):
 
     feature_acts_np = feature_acts.detach().cpu().numpy()
     attn_mask = tokens["attention_mask"].numpy().astype(bool)
-    return [csr_matrix(feature_acts_np[i][attn_mask[i]]) for i in range(feature_acts_np.shape[0])]
+    return self.tokenize(texts), [csr_matrix(feature_acts_np[i][attn_mask[i]]) for i in range(feature_acts_np.shape[0])]
 
   @ensure_loaded
   def encode_chat(self, chat_conversations):
@@ -79,6 +79,47 @@ class LocalSAE(BaseSAE):
     self.sae = None
     self.model = None
 
+  @ensure_loaded
+  def tokenize(self, documents, as_tokens = True, padding: bool = False):
+    """
+    Tokenizes a list of documents.
+
+    :param documents: List of documents to tokenize. Must be a list of strings
+    :param as_tokens: If True, return human-readable token strings. If False, return token IDs
+    :param padding: Whether to pad sequences
+    """
+    if self.chat_template_exists():
+      formatted_text = [
+          self.tokenizer.apply_chat_template(
+              [
+                  {
+                      "role": "assistant" if self.use_assistant_role else "user",
+                      "content": document
+                  }
+              ],
+              tokenize=False
+          )
+          for document in documents
+      ]
+    else:
+      formatted_text = documents
+
+    inputs = self.tokenizer(
+      formatted_text,
+      truncation=self.truncate,
+      add_special_tokens=not self.chat_template_exists(),
+      padding=padding
+    )
+
+    input_ids = inputs["input_ids"]
+
+    if not as_tokens:
+      return inputs
+
+    # Return human-readable tokens by decoding each token individually
+    return [[self.tokenizer.decode([token_id]) for token_id in input_sequence] for input_sequence in input_ids]
+
+warnings.warn("GoodfireSAE is deprecated and will be removed in a future release. Please use LocalSAE instead.", DeprecationWarning)
 class GoodfireSAE(BaseSAE):
   def __init__(self, variant_name: str = "Llama-3.1-8B-Instruct-SAE-l19", quantize = False, **kwargs):
     super().__init__(**kwargs)
@@ -166,7 +207,48 @@ class GoodfireSAE(BaseSAE):
     del outputs, inputs
     torch.cuda.empty_cache()
 
-    return [csr_matrix(feature_acts_np[i][attn_mask[i]]) for i in range(feature_acts_np.shape[0])]
+    return self.tokenize(texts), [csr_matrix(feature_acts_np[i][attn_mask[i]]) for i in range(feature_acts_np.shape[0])]
+
+  @ensure_loaded
+  def tokenize(self, documents, as_tokens = True, padding: bool = False):
+    """
+    Tokenizes a list of documents.
+
+    :param documents: List of documents to tokenize. Must be a list of strings
+    :param as_tokens: If True, return human-readable token strings. If False, return token IDs
+    :param padding: Whether to pad sequences
+    """
+    if self.chat_template_exists():
+      formatted_text = [
+          self.tokenizer.apply_chat_template(
+              [
+                  {
+                      "role": "assistant" if self.use_assistant_role else "user",
+                      "content": document
+                  }
+              ],
+              tokenize=False
+          )
+          for document in documents
+      ]
+    else:
+      formatted_text = documents
+
+    inputs = self.tokenizer(
+      formatted_text,
+      truncation=self.truncate,
+      add_special_tokens=not self.chat_template_exists(),
+      padding=padding
+    )
+
+    input_ids = inputs["input_ids"]
+
+    if not as_tokens:
+      return inputs
+
+    # Return human-readable tokens by decoding each token individually
+    return [[self.tokenizer.decode([token_id]) for token_id in input_sequence] for input_sequence in input_ids]
+
 
   def destroy_models(self):
     self.activations = dict()
